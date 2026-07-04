@@ -71,12 +71,18 @@ https://YOUR-GITHUB-USERNAME.github.io/crime-classics-tracker/
 
 ### 3. Install on iPhone
 
+Open your GitHub Pages URL in **Safari** → **Share** → **Add to Home Screen**.
+
+---
+
+### Netlify Drop (alternative, no Git needed)
+
 1. Go to [app.netlify.com/drop](https://app.netlify.com/drop)
 2. Drag the entire `crime-classics-tracker` folder onto the page
 3. Netlify gives you a URL like `https://random-name.netlify.app`
-4. Open that URL in **Safari** on your iPhone and follow steps 5–7 above
+4. Open that URL in **Safari** on your iPhone → **Share** → **Add to Home Screen**
 
-### Netlify Drop (alternative, no Git needed)
+### Test on your local network
 
 If you have Python installed on your PC:
 
