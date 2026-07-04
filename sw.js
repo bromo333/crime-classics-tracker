@@ -1,4 +1,4 @@
-const CACHE_NAME = "crime-classics-v5";
+const CACHE_NAME = "crime-classics-v6";
 
 const APP_SHELL = [
   "./index.html",
@@ -7,6 +7,7 @@ const APP_SHELL = [
   "./scan.js",
   "./books-data.js",
   "./manifest.webmanifest",
+  "./vendor/html5-qrcode.min.js",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/apple-touch-icon.png",

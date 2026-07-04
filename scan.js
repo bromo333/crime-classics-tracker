@@ -2,6 +2,8 @@ const ISBN_CACHE_KEY = "crime-classics-isbn-cache";
 
 let scannerActive = false;
 let html5Scanner = null;
+let nativeStream = null;
+let nativeDetectLoop = null;
 let processingScan = false;
 let lastScannedIsbn = "";
 let lastScanTime = 0;
@@ -308,7 +310,7 @@ function startHtml5ScannerNow() {
 
   if (typeof Html5Qrcode === "undefined") {
     scannerStarting = false;
-    showEnableCameraButton("Scanner library failed to load. Check your connection and refresh.");
+    startNativeScannerNow();
     return;
   }
 
@@ -323,6 +325,9 @@ function startHtml5ScannerNow() {
   setScannerStatus("Requesting camera access…");
   scannerActive = true;
   processingScan = false;
+
+  document.getElementById("scanner-video")?.classList.add("hidden");
+  document.getElementById("scanner-view")?.classList.remove("hidden");
 
   if (!html5Scanner) {
     html5Scanner = new Html5Qrcode("scanner-view", { verbose: false });
@@ -352,9 +357,112 @@ function startHtml5ScannerNow() {
     });
 }
 
+function startNativeScannerNow() {
+  if (scannerStarting) return;
+  scannerStarting = true;
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    scannerStarting = false;
+    showEnableCameraButton("Camera not supported in this browser.");
+    return;
+  }
+
+  if (!("BarcodeDetector" in window)) {
+    scannerStarting = false;
+    showEnableCameraButton("Barcode scanning is unavailable. Enter the ISBN manually below.");
+    return;
+  }
+
+  hideEnableCameraButton();
+  hideMatchPicker();
+  setScannerStatus("Requesting camera access…");
+  scannerActive = true;
+  processingScan = false;
+
+  const video = document.getElementById("scanner-video");
+  document.getElementById("scanner-video")?.classList.remove("hidden");
+  document.getElementById("scanner-view")?.classList.add("hidden");
+
+  navigator.mediaDevices
+    .getUserMedia({
+      video: { facingMode: { ideal: "environment" } },
+      audio: false,
+    })
+    .then(async (stream) => {
+      nativeStream = stream;
+      if (!video) throw new Error("Camera preview unavailable.");
+
+      video.setAttribute("playsinline", "true");
+      video.setAttribute("webkit-playsinline", "true");
+      video.muted = true;
+      video.srcObject = stream;
+      await video.play();
+
+      const allFormats = await BarcodeDetector.getSupportedFormats();
+      const preferred = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
+      const formats = preferred.filter((f) => allFormats.includes(f));
+      const detector = new BarcodeDetector({ formats: formats.length ? formats : allFormats });
+
+      const tick = async () => {
+        if (!scannerActive) return;
+
+        if (!processingScan) {
+          try {
+            const codes = await detector.detect(video);
+            for (const code of codes) {
+              if (code.rawValue) {
+                handleIsbn(code.rawValue);
+                break;
+              }
+            }
+          } catch {
+            // Ignore transient detection errors.
+          }
+        }
+
+        nativeDetectLoop = requestAnimationFrame(tick);
+      };
+
+      nativeDetectLoop = requestAnimationFrame(tick);
+      scannerStarting = false;
+      setScannerStatus("Aim at the ISBN barcode on the back cover");
+      hideEnableCameraButton();
+    })
+    .catch((error) => {
+      scannerStarting = false;
+      scannerActive = false;
+      console.error(error);
+      showEnableCameraButton(cameraErrorMessage(error));
+      window.CollectionTracker?.showToast("Could not start camera");
+    });
+}
+
+function startScannerNow() {
+  if (typeof Html5Qrcode !== "undefined") {
+    startHtml5ScannerNow();
+  } else {
+    startNativeScannerNow();
+  }
+}
+
 async function stopScanner() {
   scannerActive = false;
   scannerStarting = false;
+
+  if (nativeDetectLoop) {
+    cancelAnimationFrame(nativeDetectLoop);
+    nativeDetectLoop = null;
+  }
+
+  if (nativeStream) {
+    nativeStream.getTracks().forEach((track) => track.stop());
+    nativeStream = null;
+  }
+
+  const video = document.getElementById("scanner-video");
+  if (video) {
+    video.srcObject = null;
+  }
 
   if (html5Scanner) {
     try {
@@ -389,7 +497,7 @@ function setupScanner() {
   });
   document.getElementById("scanner-enable-camera")?.addEventListener("click", (event) => {
     event.preventDefault();
-    stopScanner().finally(() => startHtml5ScannerNow());
+    stopScanner().finally(() => startScannerNow());
   });
 
   document.getElementById("scanner-modal")?.addEventListener("click", (event) => {
@@ -424,7 +532,7 @@ window.startCrimeScanner = function startCrimeScanner(event) {
   }
 
   // Must call camera start directly from the tap handler — no await before this.
-  startHtml5ScannerNow();
+  startScannerNow();
 };
 
 window.openScanner = window.startCrimeScanner;
