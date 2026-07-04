@@ -648,6 +648,23 @@ body.scanner-open {
   color: var(--accent);
 }
 
+.scanner-enable-camera {
+  width: 100%;
+  margin-top: 0.75rem;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.scanner-enable-camera.hidden {
+  display: none;
+}
+
+#scanner-view video {
+  width: 100% !important;
+  height: auto !important;
+  border-radius: var(--radius);
+}
+
 .scanner-match-picker {
   margin-top: 0.75rem;
 }

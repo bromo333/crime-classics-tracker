@@ -1,4 +1,4 @@
-const CACHE_NAME = "crime-classics-v4";
+const CACHE_NAME = "crime-classics-v5";
 
 const APP_SHELL = [
   "./index.html",

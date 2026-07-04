@@ -1,13 +1,11 @@
 const ISBN_CACHE_KEY = "crime-classics-isbn-cache";
-const HTML5_QRCODE_URL = "https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js";
 
 let scannerActive = false;
 let html5Scanner = null;
-let nativeStream = null;
-let nativeDetectLoop = null;
 let processingScan = false;
 let lastScannedIsbn = "";
 let lastScanTime = 0;
+let scannerStarting = false;
 
 function loadIsbnCache() {
   try {
@@ -125,6 +123,37 @@ function setScannerStatus(message, type = "") {
   status.className = "scanner-status" + (type ? ` scanner-status-${type}` : "");
 }
 
+function showEnableCameraButton(message) {
+  setScannerStatus(message, "error");
+  document.getElementById("scanner-enable-camera")?.classList.remove("hidden");
+}
+
+function hideEnableCameraButton() {
+  document.getElementById("scanner-enable-camera")?.classList.add("hidden");
+}
+
+function cameraErrorMessage(error) {
+  const name = error?.name || "";
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    return "Camera blocked. Tap Enable camera below, or allow access in Settings → Safari → Camera.";
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return "No camera found on this device.";
+  }
+  if (name === "NotReadableError") {
+    return "Camera is in use by another app. Close it and try again.";
+  }
+  return error?.message || "Could not access the camera.";
+}
+
+function showScannerModal() {
+  document.getElementById("scanner-modal")?.classList.remove("hidden");
+  document.body.classList.add("scanner-open");
+  document.getElementById("scanner-view-wrap")?.classList.remove("hidden");
+  document.getElementById("scanner-video")?.classList.add("hidden");
+  document.getElementById("scanner-view")?.classList.remove("hidden");
+}
+
 function showMatchPicker(matches, lookup) {
   const ct = window.CollectionTracker;
   const picker = document.getElementById("scanner-match-picker");
@@ -148,6 +177,7 @@ function showMatchPicker(matches, lookup) {
 
   picker.classList.remove("hidden");
   document.getElementById("scanner-view-wrap")?.classList.add("hidden");
+  hideEnableCameraButton();
 
   list.querySelectorAll(".scanner-match-item").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -159,7 +189,7 @@ function showMatchPicker(matches, lookup) {
 function hideMatchPicker() {
   document.getElementById("scanner-match-picker")?.classList.add("hidden");
   document.getElementById("scanner-view-wrap")?.classList.remove("hidden");
-  document.getElementById("scanner-match-list").replaceChildren();
+  document.getElementById("scanner-match-list")?.replaceChildren();
 }
 
 function confirmBookMatch(bookId, lookup) {
@@ -190,7 +220,6 @@ async function handleIsbn(rawIsbn) {
   processingScan = true;
   lastScannedIsbn = isbn;
   lastScanTime = now;
-  pauseScanning();
   setScannerStatus(`Looking up ISBN ${isbn}…`);
 
   try {
@@ -240,24 +269,6 @@ async function handleIsbn(rawIsbn) {
   }
 }
 
-function loadScript(url) {
-  return new Promise((resolve, reject) => {
-    if (document.querySelector(`script[src="${url}"]`)) {
-      resolve();
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = url;
-    script.onload = resolve;
-    script.onerror = () => reject(new Error("Could not load scanner library"));
-    document.head.appendChild(script);
-  });
-}
-
-function pauseScanning() {
-  // Scanner engines stay active; processingScan gate prevents duplicate lookups.
-}
-
 function resumeScanning() {
   processingScan = false;
   if (scannerActive) {
@@ -265,163 +276,106 @@ function resumeScanning() {
   }
 }
 
-async function startNativeScanner() {
-  if (!("BarcodeDetector" in window)) {
-    return false;
-  }
-
-  const formats = await BarcodeDetector.getSupportedFormats();
-  const supported = formats.filter((f) => f === "ean_13" || f === "ean_8");
-  if (!supported.length) return false;
-
-  const video = document.getElementById("scanner-video");
-  if (!video) return false;
-
-  nativeStream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: { ideal: "environment" } },
-    audio: false,
-  });
-
-  video.srcObject = nativeStream;
-  await video.play();
-
-  const detector = new BarcodeDetector({ formats: supported });
-
-  const tick = async () => {
-    if (!scannerActive) return;
-
-    if (!processingScan) {
-      try {
-        const barcodes = await detector.detect(video);
-        for (const code of barcodes) {
-          if (code.rawValue) {
-            handleIsbn(code.rawValue);
-            break;
-          }
-        }
-      } catch {
-        // Ignore transient detection errors.
-      }
-    }
-
-    nativeDetectLoop = requestAnimationFrame(tick);
+function getScannerConfig() {
+  const config = {
+    fps: 10,
+    qrbox: (width, height) => ({
+      width: Math.floor(Math.min(width * 0.92, 340)),
+      height: Math.floor(Math.min(height * 0.38, 160)),
+    }),
+    disableFlip: false,
   };
 
-  nativeDetectLoop = requestAnimationFrame(tick);
-  return true;
+  if (typeof Html5QrcodeSupportedFormats !== "undefined") {
+    config.formatsToSupport = [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+    ];
+  }
+
+  return config;
 }
 
-async function startHtml5Scanner() {
-  await loadScript(HTML5_QRCODE_URL);
+function startHtml5ScannerNow() {
+  if (scannerStarting) return;
+  scannerStarting = true;
 
-  const container = document.getElementById("scanner-view");
-  if (!container || typeof Html5Qrcode === "undefined") {
-    throw new Error("Scanner library unavailable");
+  if (!window.isSecureContext) {
+    scannerStarting = false;
+    showEnableCameraButton("Camera requires HTTPS. Open the app via your GitHub Pages URL.");
+    return;
   }
 
-  html5Scanner = new Html5Qrcode("scanner-view", { verbose: false });
-
-  const formats = [];
-  if (typeof Html5QrcodeSupportedFormats !== "undefined") {
-    formats.push(Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8);
+  if (typeof Html5Qrcode === "undefined") {
+    scannerStarting = false;
+    showEnableCameraButton("Scanner library failed to load. Check your connection and refresh.");
+    return;
   }
 
-  await html5Scanner.start(
-    { facingMode: "environment" },
-    {
-      fps: 10,
-      qrbox: (width, height) => ({
-        width: Math.min(width * 0.92, 340),
-        height: Math.min(height * 0.38, 160),
-      }),
-      aspectRatio: 1.777,
-      ...(formats.length ? { formatsToSupport: formats } : {}),
-    },
-    (decodedText) => handleIsbn(decodedText),
-    () => {}
-  );
+  if (!navigator.mediaDevices?.getUserMedia) {
+    scannerStarting = false;
+    showEnableCameraButton("Camera not supported in this browser.");
+    return;
+  }
+
+  hideEnableCameraButton();
+  hideMatchPicker();
+  setScannerStatus("Requesting camera access…");
+  scannerActive = true;
+  processingScan = false;
+
+  if (!html5Scanner) {
+    html5Scanner = new Html5Qrcode("scanner-view", { verbose: false });
+  }
+
+  const startPromise = html5Scanner.getState?.() === Html5QrcodeScannerState?.SCANNING
+    ? Promise.resolve()
+    : html5Scanner.start(
+        { facingMode: "environment" },
+        getScannerConfig(),
+        (decodedText) => handleIsbn(decodedText),
+        () => {}
+      );
+
+  startPromise
+    .then(() => {
+      scannerStarting = false;
+      setScannerStatus("Aim at the ISBN barcode on the back cover");
+      hideEnableCameraButton();
+    })
+    .catch((error) => {
+      scannerStarting = false;
+      scannerActive = false;
+      console.error(error);
+      showEnableCameraButton(cameraErrorMessage(error));
+      window.CollectionTracker?.showToast("Could not start camera");
+    });
 }
 
 async function stopScanner() {
   scannerActive = false;
-
-  if (nativeDetectLoop) {
-    cancelAnimationFrame(nativeDetectLoop);
-    nativeDetectLoop = null;
-  }
-
-  if (nativeStream) {
-    nativeStream.getTracks().forEach((track) => track.stop());
-    nativeStream = null;
-  }
-
-  const video = document.getElementById("scanner-video");
-  if (video) {
-    video.srcObject = null;
-  }
+  scannerStarting = false;
 
   if (html5Scanner) {
     try {
-      await html5Scanner.stop();
+      const state = html5Scanner.getState?.();
+      if (state === Html5QrcodeScannerState?.SCANNING || state === Html5QrcodeScannerState?.PAUSED) {
+        await html5Scanner.stop();
+      }
       html5Scanner.clear();
     } catch {
       // Already stopped.
     }
-    html5Scanner = null;
-  }
-
-  document.getElementById("scanner-view-wrap")?.classList.remove("hidden");
-  document.getElementById("scanner-video")?.classList.add("hidden");
-  document.getElementById("scanner-view")?.classList.remove("hidden");
-}
-
-async function openScanner() {
-  const modal = document.getElementById("scanner-modal");
-  if (!modal) return;
-
-  modal.classList.remove("hidden");
-  document.body.classList.add("scanner-open");
-  hideMatchPicker();
-  setScannerStatus("Starting camera…");
-
-  scannerActive = true;
-  processingScan = false;
-
-  if (!window.isSecureContext) {
-    throw new Error("Camera requires HTTPS. Open the app via your GitHub Pages URL.");
-  }
-
-  if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error("Camera not supported in this browser.");
-  }
-
-  try {
-    const nativeStarted = await startNativeScanner();
-    if (nativeStarted) {
-      document.getElementById("scanner-video")?.classList.remove("hidden");
-      document.getElementById("scanner-view")?.classList.add("hidden");
-      document.getElementById("scanner-view-wrap")?.classList.remove("hidden");
-      setScannerStatus("Aim at the ISBN barcode on the back cover");
-      return;
-    }
-
-    document.getElementById("scanner-video")?.classList.add("hidden");
-    document.getElementById("scanner-view")?.classList.remove("hidden");
-    document.getElementById("scanner-view-wrap")?.classList.remove("hidden");
-    await startHtml5Scanner();
-    setScannerStatus("Aim at the ISBN barcode on the back cover");
-  } catch (error) {
-    setScannerStatus(error.message || "Camera access denied", "error");
-    window.CollectionTracker.showToast("Could not start camera");
   }
 }
 
 async function closeScanner() {
   await stopScanner();
   hideMatchPicker();
+  hideEnableCameraButton();
+  setScannerStatus("");
   document.getElementById("scanner-modal")?.classList.add("hidden");
   document.body.classList.remove("scanner-open");
-  setScannerStatus("");
 }
 
 function setupScanner() {
@@ -432,6 +386,10 @@ function setupScanner() {
   document.getElementById("scanner-cancel-match")?.addEventListener("click", () => {
     hideMatchPicker();
     resumeScanning();
+  });
+  document.getElementById("scanner-enable-camera")?.addEventListener("click", (event) => {
+    event.preventDefault();
+    stopScanner().finally(() => startHtml5ScannerNow());
   });
 
   document.getElementById("scanner-modal")?.addEventListener("click", (event) => {
@@ -454,21 +412,19 @@ window.startCrimeScanner = function startCrimeScanner(event) {
   event?.preventDefault?.();
   event?.stopPropagation?.();
 
-  const modal = document.getElementById("scanner-modal");
-  if (modal) {
-    modal.classList.remove("hidden");
-    document.body.classList.add("scanner-open");
+  showScannerModal();
+
+  if (!window.isSecureContext) {
+    showEnableCameraButton("Camera requires HTTPS. Open the app via your GitHub Pages URL.");
+    return;
   }
 
-  if (typeof openScanner === "function") {
-    openScanner().catch((error) => {
-      console.error(error);
-      setScannerStatus(error.message || "Could not open scanner", "error");
-      window.CollectionTracker?.showToast("Could not open scanner");
-    });
-  } else {
-    setScannerStatus("Scanner failed to load. Refresh the page and try again.", "error");
+  if (scannerActive || scannerStarting) {
+    return;
   }
+
+  // Must call camera start directly from the tap handler — no await before this.
+  startHtml5ScannerNow();
 };
 
 window.openScanner = window.startCrimeScanner;

@@ -121,9 +121,13 @@
       <p class="scanner-hint">Point your camera at the barcode on the back cover. The book will be marked as owned if it matches the Crime Classics list.</p>
 
       <div id="scanner-view-wrap">
-        <video id="scanner-video" class="scanner-video hidden" playsinline muted></video>
+        <video id="scanner-video" class="scanner-video hidden" playsinline webkit-playsinline muted autoplay></video>
         <div id="scanner-view" class="scanner-view"></div>
       </div>
+
+      <button type="button" class="btn btn-primary scanner-enable-camera hidden" id="scanner-enable-camera">
+        Enable camera
+      </button>
 
       <p class="scanner-status" id="scanner-status" aria-live="polite"></p>
 
@@ -143,6 +147,7 @@
     </div>
   </div>
 
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
     window.startCrimeScanner = function (event) {
       event?.preventDefault?.();
@@ -153,8 +158,8 @@
       }
     };
   </script>
-  <script src="books-data.js?v=4"></script>
-  <script src="scan.js?v=4"></script>
-  <script src="app.js?v=4"></script>
+  <script src="books-data.js?v=5"></script>
+  <script src="scan.js?v=5"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>
