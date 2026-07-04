@@ -321,6 +321,11 @@ async function startHtml5Scanner() {
 
   html5Scanner = new Html5Qrcode("scanner-view", { verbose: false });
 
+  const formats = [];
+  if (typeof Html5QrcodeSupportedFormats !== "undefined") {
+    formats.push(Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8);
+  }
+
   await html5Scanner.start(
     { facingMode: "environment" },
     {
@@ -330,6 +335,7 @@ async function startHtml5Scanner() {
         height: Math.min(height * 0.38, 160),
       }),
       aspectRatio: 1.777,
+      ...(formats.length ? { formatsToSupport: formats } : {}),
     },
     (decodedText) => handleIsbn(decodedText),
     () => {}
@@ -364,7 +370,7 @@ async function stopScanner() {
     html5Scanner = null;
   }
 
-  document.getElementById("scanner-view-wrap")?.classList.add("hidden");
+  document.getElementById("scanner-view-wrap")?.classList.remove("hidden");
   document.getElementById("scanner-video")?.classList.add("hidden");
   document.getElementById("scanner-view")?.classList.remove("hidden");
 }
@@ -380,6 +386,14 @@ async function openScanner() {
 
   scannerActive = true;
   processingScan = false;
+
+  if (!window.isSecureContext) {
+    throw new Error("Camera requires HTTPS. Open the app via your GitHub Pages URL.");
+  }
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("Camera not supported in this browser.");
+  }
 
   try {
     const nativeStarted = await startNativeScanner();
@@ -411,7 +425,18 @@ async function closeScanner() {
 }
 
 function setupScanner() {
-  document.getElementById("scan-btn")?.addEventListener("click", openScanner);
+  const scanBtn = document.getElementById("scan-btn");
+  if (!scanBtn || setupScanner.initialized) return;
+  setupScanner.initialized = true;
+
+  scanBtn.addEventListener("click", () => {
+    openScanner().catch((error) => {
+      console.error(error);
+      setScannerStatus(error.message || "Could not open scanner", "error");
+      window.CollectionTracker?.showToast("Could not open scanner");
+    });
+  });
+
   document.getElementById("scanner-close")?.addEventListener("click", closeScanner);
   document.getElementById("scanner-cancel-match")?.addEventListener("click", () => {
     hideMatchPicker();
@@ -432,4 +457,5 @@ function setupScanner() {
   });
 }
 
+setupScanner.initialized = false;
 window.setupScanner = setupScanner;
