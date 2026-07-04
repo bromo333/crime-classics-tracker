@@ -314,6 +314,21 @@ function init() {
   render();
   setupInstallBanner();
   registerServiceWorker();
+
+  window.CollectionTracker = {
+    get books() {
+      return books;
+    },
+    markOwned(id) {
+      setBookState(id, "owned", true);
+    },
+    showToast,
+    escapeHtml,
+  };
+
+  if (typeof setupScanner === "function") {
+    setupScanner();
+  }
 }
 
 init();

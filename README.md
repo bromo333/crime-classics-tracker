@@ -13,6 +13,7 @@ Installable on **iPhone** as a home-screen app (PWA).
 - **Sort** by series number, title, author, or publication date
 - **Progress stats** with collection completion percentage
 - **Export / Import** your collection as JSON (for backups or moving between devices)
+- **ISBN barcode scanner** — scan a book to look it up and mark it owned
 - **Offline support** once installed
 - **Local storage** — no account needed; data stays on your device
 
@@ -104,8 +105,19 @@ Find your PC's local IP (e.g. `192.168.1.42`), then on your iPhone (same Wi‑Fi
 | Book icon | Mark as **owned** |
 | Eye icon | Mark as **read** |
 | Star icon | Add to **wishlist** |
+| **Scan** button | Scan the ISBN barcode to look up and mark a book **owned** |
 
 Marking a book as owned clears its wishlist status, and vice versa.
+
+### Barcode scanning
+
+1. Tap **Scan** and allow camera access when prompted
+2. Point at the ISBN barcode on the back cover
+3. The app looks up the ISBN via [Open Library](https://openlibrary.org) and matches it to the Crime Classics catalogue
+4. If there's a clear match, the book is marked owned automatically; otherwise you'll pick from a short list
+5. You can also type an ISBN manually at the bottom of the scanner
+
+Scanning requires an internet connection for the ISBN lookup. Successfully matched ISBNs are cached locally for faster rescans.
 
 Use **Export** to download a JSON backup. Use **Import** to restore from a previous export.
 

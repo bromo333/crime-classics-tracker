@@ -90,6 +90,10 @@
       </div>
 
       <div class="action-group">
+        <button class="btn btn-primary" id="scan-btn" title="Scan ISBN barcode to add a book">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+          Scan
+        </button>
         <button class="btn btn-secondary" id="export-btn" title="Download your collection as JSON">Export</button>
         <label class="btn btn-secondary" for="import-file" title="Restore from a backup file">Import</label>
         <input type="file" id="import-file" accept=".json" hidden>
@@ -107,7 +111,40 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <div class="scanner-modal hidden" id="scanner-modal" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
+    <div class="scanner-panel">
+      <div class="scanner-header">
+        <h2 id="scanner-title">Scan ISBN barcode</h2>
+        <button class="scanner-close" id="scanner-close" aria-label="Close scanner">✕</button>
+      </div>
+
+      <p class="scanner-hint">Point your camera at the barcode on the back cover. The book will be marked as owned if it matches the Crime Classics list.</p>
+
+      <div id="scanner-view-wrap">
+        <video id="scanner-video" class="scanner-video hidden" playsinline muted></video>
+        <div id="scanner-view" class="scanner-view"></div>
+      </div>
+
+      <p class="scanner-status" id="scanner-status" aria-live="polite"></p>
+
+      <div class="scanner-match-picker hidden" id="scanner-match-picker">
+        <p class="scanner-match-label">Which book is this?</p>
+        <div class="scanner-match-list" id="scanner-match-list"></div>
+        <button type="button" class="btn btn-secondary scanner-cancel-match" id="scanner-cancel-match">Back to scanner</button>
+      </div>
+
+      <form class="scanner-manual-form" id="scanner-manual-form">
+        <label for="scanner-manual-isbn">Or enter ISBN manually</label>
+        <div class="scanner-manual-row">
+          <input type="text" id="scanner-manual-isbn" inputmode="numeric" placeholder="9780712356789" autocomplete="off">
+          <button type="submit" class="btn btn-secondary">Look up</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="books-data.js"></script>
   <script src="app.js"></script>
+  <script src="scan.js"></script>
 </body>
 </html>

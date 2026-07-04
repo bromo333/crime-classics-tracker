@@ -1,10 +1,11 @@
-const CACHE_NAME = "crime-classics-v1";
+const CACHE_NAME = "crime-classics-v2";
 
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./scan.js",
   "./books-data.js",
   "./manifest.webmanifest",
   "./icons/icon-192.png",

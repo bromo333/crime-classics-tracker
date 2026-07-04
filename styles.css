@@ -343,6 +343,25 @@ h1 {
   border-color: var(--text-muted);
 }
 
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: linear-gradient(135deg, var(--accent), #8b3a28);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 500;
+}
+
+.btn-primary svg {
+  width: 16px;
+  height: 16px;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+
 .results-count {
   margin: 0 0 0.75rem;
   font-size: 0.82rem;
@@ -520,6 +539,203 @@ h1 {
 
 .toast.show {
   transform: translateX(-50%) translateY(0);
+}
+
+body.scanner-open {
+  overflow: hidden;
+}
+
+.scanner-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding:
+    env(safe-area-inset-top)
+    env(safe-area-inset-right)
+    env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.scanner-modal.hidden {
+  display: none;
+}
+
+.scanner-panel {
+  width: min(100%, 520px);
+  max-height: calc(100dvh - 1rem);
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px 16px 0 0;
+  padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom));
+  box-shadow: var(--shadow);
+}
+
+.scanner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.scanner-header h2 {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 1.25rem;
+}
+
+.scanner-close {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.scanner-hint {
+  margin: 0 0 0.85rem;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+#scanner-view-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: #000;
+  min-height: 220px;
+}
+
+.scanner-video,
+.scanner-view,
+#scanner-view {
+  width: 100%;
+  min-height: 220px;
+}
+
+.scanner-video {
+  display: block;
+  object-fit: cover;
+}
+
+.scanner-video.hidden,
+.scanner-modal.hidden,
+.scanner-match-picker.hidden {
+  display: none !important;
+}
+
+.scanner-status {
+  min-height: 1.4rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.scanner-status-success {
+  color: var(--owned);
+}
+
+.scanner-status-error {
+  color: var(--accent);
+}
+
+.scanner-match-picker {
+  margin-top: 0.75rem;
+}
+
+.scanner-match-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+}
+
+.scanner-match-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.65rem;
+}
+
+.scanner-match-item {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scanner-match-item:hover {
+  border-color: var(--owned);
+}
+
+.scanner-match-num {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.scanner-match-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.scanner-match-info strong {
+  font-family: var(--font-serif);
+  font-size: 0.98rem;
+}
+
+.scanner-match-info span {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.scanner-manual-form {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.scanner-manual-form label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.scanner-manual-row {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.scanner-manual-row input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.55rem 0.75rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+.scanner-manual-row input:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 /* Responsive */
