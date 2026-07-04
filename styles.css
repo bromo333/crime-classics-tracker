@@ -331,6 +331,8 @@ h1 {
   cursor: pointer;
   border: 1px solid var(--border);
   transition: all 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .btn-secondary {
@@ -753,6 +755,14 @@ body.scanner-open {
   .action-group {
     margin-left: 0;
     width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .action-group .btn-primary {
+    flex: 1 1 100%;
+    justify-content: center;
+    min-height: 44px;
+    font-size: 0.95rem;
   }
 
   .stats-panel {

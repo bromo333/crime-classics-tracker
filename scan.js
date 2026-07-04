@@ -425,17 +425,8 @@ async function closeScanner() {
 }
 
 function setupScanner() {
-  const scanBtn = document.getElementById("scan-btn");
-  if (!scanBtn || setupScanner.initialized) return;
+  if (setupScanner.initialized) return;
   setupScanner.initialized = true;
-
-  scanBtn.addEventListener("click", () => {
-    openScanner().catch((error) => {
-      console.error(error);
-      setScannerStatus(error.message || "Could not open scanner", "error");
-      window.CollectionTracker?.showToast("Could not open scanner");
-    });
-  });
 
   document.getElementById("scanner-close")?.addEventListener("click", closeScanner);
   document.getElementById("scanner-cancel-match")?.addEventListener("click", () => {
@@ -458,4 +449,30 @@ function setupScanner() {
 }
 
 setupScanner.initialized = false;
+
+window.startCrimeScanner = function startCrimeScanner(event) {
+  event?.preventDefault?.();
+  event?.stopPropagation?.();
+
+  const modal = document.getElementById("scanner-modal");
+  if (modal) {
+    modal.classList.remove("hidden");
+    document.body.classList.add("scanner-open");
+  }
+
+  if (typeof openScanner === "function") {
+    openScanner().catch((error) => {
+      console.error(error);
+      setScannerStatus(error.message || "Could not open scanner", "error");
+      window.CollectionTracker?.showToast("Could not open scanner");
+    });
+  } else {
+    setScannerStatus("Scanner failed to load. Refresh the page and try again.", "error");
+  }
+};
+
+window.openScanner = window.startCrimeScanner;
+window.closeScanner = closeScanner;
 window.setupScanner = setupScanner;
+
+setupScanner();
