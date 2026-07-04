@@ -22,26 +22,55 @@ Installable on **iPhone** as a home-screen app (PWA).
 
 iPhone requires the app to be served over **HTTPS** (a website URL). Opening the file directly from your computer won't work on your phone.
 
-### Option A: GitHub Pages (free, recommended)
+---
 
-1. Create a GitHub repository and upload the `crime-classics-tracker` folder
-2. Go to **Settings → Pages → Deploy from branch**
-3. Choose `main` branch, `/ (root)` folder, and save
-4. Wait a minute, then open your URL (e.g. `https://yourname.github.io/crime-classics-tracker/`) in **Safari** on your iPhone
-5. Tap the **Share** button (square with arrow)
-6. Scroll down and tap **Add to Home Screen**
-7. Tap **Add**
+## Deploy to GitHub Pages
 
-The app now appears on your home screen like a native app and works offline.
+The repo is ready to push. Run these commands **once** in PowerShell from the `crime-classics-tracker` folder:
 
-### Option B: Netlify Drop (free, no Git needed)
+### 1. Sign in to GitHub
+
+```powershell
+gh auth login
+```
+
+Choose: **GitHub.com** → **HTTPS** → **Login with a web browser**, then follow the prompts.
+
+### 2. Deploy
+
+```powershell
+.\deploy.ps1
+```
+
+This creates a public repo called `crime-classics-tracker`, pushes the code, and enables GitHub Pages. After 1–2 minutes your app will be live at:
+
+```
+https://YOUR-GITHUB-USERNAME.github.io/crime-classics-tracker/
+```
+
+### 3. Install on iPhone
+
+Open that URL in **Safari** → **Share** → **Add to Home Screen**.
+
+### Manual alternative
+
+If you prefer to create the repo yourself on [github.com/new](https://github.com/new):
+
+```powershell
+git remote add origin https://github.com/YOUR-USERNAME/crime-classics-tracker.git
+git push -u origin main
+```
+
+Then go to **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+---
 
 1. Go to [app.netlify.com/drop](https://app.netlify.com/drop)
 2. Drag the entire `crime-classics-tracker` folder onto the page
 3. Netlify gives you a URL like `https://random-name.netlify.app`
 4. Open that URL in **Safari** on your iPhone and follow steps 5–7 above
 
-### Option C: Test on your local network
+### Netlify Drop (alternative, no Git needed)
 
 If you have Python installed on your PC:
 
