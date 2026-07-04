@@ -76,16 +76,12 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
-Write-Host "Enabling GitHub Pages (GitHub Actions)..."
-gh api "repos/$owner/$RepoName/pages" -X POST -f build_type=workflow 2>$null
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "Pages may already be enabled, or enable manually:"
-  Write-Host "  https://github.com/$owner/$RepoName/settings/pages"
-  Write-Host "  Source: GitHub Actions"
-}
-
+Write-Host "Enable GitHub Pages (one-time, in your browser):"
+Write-Host "  https://github.com/$owner/$RepoName/settings/pages"
+Write-Host "  Build and deployment -> Source: Deploy from a branch"
+Write-Host "  Branch: main, folder: / (root), then Save"
 Write-Host ""
-Write-Host "Done! After the workflow finishes (1-2 minutes), your app will be at:"
+Write-Host "After saving, your app will be at:"
 Write-Host "  https://$owner.github.io/$RepoName/"
 Write-Host ""
 Write-Host "Install on iPhone: open that URL in Safari -> Share -> Add to Home Screen"

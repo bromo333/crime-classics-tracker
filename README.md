@@ -61,9 +61,15 @@ git remote add origin https://github.com/YOUR-USERNAME/crime-classics-tracker.gi
 git push -u origin main
 ```
 
-Then go to **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+Then go to **Settings → Pages → Build and deployment → Source: Deploy from a branch**, choose **main** and **/ (root)**, then Save.
 
----
+After a minute your app will be at:
+
+```
+https://YOUR-GITHUB-USERNAME.github.io/crime-classics-tracker/
+```
+
+### 3. Install on iPhone
 
 1. Go to [app.netlify.com/drop](https://app.netlify.com/drop)
 2. Drag the entire `crime-classics-tracker` folder onto the page
