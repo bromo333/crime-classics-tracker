@@ -152,8 +152,7 @@ function showScannerModal() {
   document.getElementById("scanner-modal")?.classList.remove("hidden");
   document.body.classList.add("scanner-open");
   document.getElementById("scanner-view-wrap")?.classList.remove("hidden");
-  document.getElementById("scanner-video")?.classList.add("hidden");
-  document.getElementById("scanner-view")?.classList.remove("hidden");
+  showVideoScanner();
 }
 
 function showMatchPicker(matches, lookup) {
@@ -274,16 +273,91 @@ async function handleIsbn(rawIsbn) {
 function resumeScanning() {
   processingScan = false;
   if (scannerActive) {
-    setScannerStatus("Aim at the ISBN barcode on the back cover");
+    setScannerStatus("Align the ISBN barcode inside the yellow guide");
   }
+}
+
+let zxingReader = null;
+let barcodeDetectInterval = null;
+let barcodeDetector = null;
+
+function isLikelyIsbn(raw) {
+  const isbn = normalizeIsbn(raw);
+  if (isbn.length === 13) {
+    return isbn.startsWith("978") || isbn.startsWith("979");
+  }
+  return isbn.length === 10;
+}
+
+function onBarcodeDetected(raw) {
+  if (!raw || processingScan) return;
+  if (!isLikelyIsbn(raw)) return;
+  handleIsbn(raw);
+}
+
+function getCameraConstraints() {
+  return {
+    audio: false,
+    video: {
+      facingMode: { ideal: "environment" },
+      width: { ideal: 1920, min: 640 },
+      height: { ideal: 1080, min: 480 },
+    },
+  };
+}
+
+function showVideoScanner() {
+  document.getElementById("scanner-video")?.classList.remove("hidden");
+  document.getElementById("scanner-view")?.classList.add("hidden");
+}
+
+function startBarcodeDetectorLoop(video) {
+  if (!("BarcodeDetector" in window) || barcodeDetectInterval) return;
+
+  BarcodeDetector.getSupportedFormats()
+    .then((allFormats) => {
+      const preferred = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
+      const formats = preferred.filter((f) => allFormats.includes(f));
+      barcodeDetector = new BarcodeDetector({ formats: formats.length ? formats : allFormats });
+
+      barcodeDetectInterval = window.setInterval(async () => {
+        if (!scannerActive || processingScan || !video.videoWidth) return;
+
+        try {
+          const codes = await barcodeDetector.detect(video);
+          for (const code of codes) {
+            if (code.rawValue) {
+              onBarcodeDetected(code.rawValue);
+              break;
+            }
+          }
+        } catch {
+          // Ignore transient detection errors.
+        }
+      }, 250);
+    })
+    .catch(() => {
+      // BarcodeDetector unavailable.
+    });
+}
+
+function startZxingLoop(video) {
+  if (typeof ZXingBrowser === "undefined" || zxingReader) return;
+
+  zxingReader = new ZXingBrowser.BrowserMultiFormatReader();
+  zxingReader.decodeFromVideoElement(video, (result) => {
+    if (result) {
+      onBarcodeDetected(result.getText());
+    }
+  });
 }
 
 function getScannerConfig() {
   const config = {
-    fps: 10,
+    fps: 15,
     qrbox: (width, height) => ({
-      width: Math.floor(Math.min(width * 0.92, 340)),
-      height: Math.floor(Math.min(height * 0.38, 160)),
+      width: Math.floor(width * 0.95),
+      height: Math.floor(height * 0.55),
     }),
     disableFlip: false,
   };
@@ -299,6 +373,26 @@ function getScannerConfig() {
 }
 
 function startHtml5ScannerNow() {
+  if (typeof Html5Qrcode === "undefined") {
+    throw new Error("Scanner library unavailable.");
+  }
+
+  document.getElementById("scanner-video")?.classList.add("hidden");
+  document.getElementById("scanner-view")?.classList.remove("hidden");
+
+  if (!html5Scanner) {
+    html5Scanner = new Html5Qrcode("scanner-view", { verbose: false });
+  }
+
+  return html5Scanner.start(
+    { facingMode: "environment" },
+    getScannerConfig(),
+    (decodedText) => onBarcodeDetected(decodedText),
+    () => {}
+  );
+}
+
+function startUnifiedScannerNow() {
   if (scannerStarting) return;
   scannerStarting = true;
 
@@ -308,12 +402,6 @@ function startHtml5ScannerNow() {
     return;
   }
 
-  if (typeof Html5Qrcode === "undefined") {
-    scannerStarting = false;
-    startNativeScannerNow();
-    return;
-  }
-
   if (!navigator.mediaDevices?.getUserMedia) {
     scannerStarting = false;
     showEnableCameraButton("Camera not supported in this browser.");
@@ -325,110 +413,50 @@ function startHtml5ScannerNow() {
   setScannerStatus("Requesting camera access…");
   scannerActive = true;
   processingScan = false;
-
-  document.getElementById("scanner-video")?.classList.add("hidden");
-  document.getElementById("scanner-view")?.classList.remove("hidden");
-
-  if (!html5Scanner) {
-    html5Scanner = new Html5Qrcode("scanner-view", { verbose: false });
-  }
-
-  const startPromise = html5Scanner.getState?.() === Html5QrcodeScannerState?.SCANNING
-    ? Promise.resolve()
-    : html5Scanner.start(
-        { facingMode: "environment" },
-        getScannerConfig(),
-        (decodedText) => handleIsbn(decodedText),
-        () => {}
-      );
-
-  startPromise
-    .then(() => {
-      scannerStarting = false;
-      setScannerStatus("Aim at the ISBN barcode on the back cover");
-      hideEnableCameraButton();
-    })
-    .catch((error) => {
-      scannerStarting = false;
-      scannerActive = false;
-      console.error(error);
-      showEnableCameraButton(cameraErrorMessage(error));
-      window.CollectionTracker?.showToast("Could not start camera");
-    });
-}
-
-function startNativeScannerNow() {
-  if (scannerStarting) return;
-  scannerStarting = true;
-
-  if (!navigator.mediaDevices?.getUserMedia) {
-    scannerStarting = false;
-    showEnableCameraButton("Camera not supported in this browser.");
-    return;
-  }
-
-  if (!("BarcodeDetector" in window)) {
-    scannerStarting = false;
-    showEnableCameraButton("Barcode scanning is unavailable. Enter the ISBN manually below.");
-    return;
-  }
-
-  hideEnableCameraButton();
-  hideMatchPicker();
-  setScannerStatus("Requesting camera access…");
-  scannerActive = true;
-  processingScan = false;
+  showVideoScanner();
 
   const video = document.getElementById("scanner-video");
-  document.getElementById("scanner-video")?.classList.remove("hidden");
-  document.getElementById("scanner-view")?.classList.add("hidden");
+  if (!video) {
+    scannerStarting = false;
+    showEnableCameraButton("Camera preview unavailable.");
+    return;
+  }
 
   navigator.mediaDevices
-    .getUserMedia({
-      video: { facingMode: { ideal: "environment" } },
-      audio: false,
-    })
+    .getUserMedia(getCameraConstraints())
     .then(async (stream) => {
       nativeStream = stream;
-      if (!video) throw new Error("Camera preview unavailable.");
-
       video.setAttribute("playsinline", "true");
       video.setAttribute("webkit-playsinline", "true");
       video.muted = true;
       video.srcObject = stream;
       await video.play();
 
-      const allFormats = await BarcodeDetector.getSupportedFormats();
-      const preferred = ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"];
-      const formats = preferred.filter((f) => allFormats.includes(f));
-      const detector = new BarcodeDetector({ formats: formats.length ? formats : allFormats });
+      startBarcodeDetectorLoop(video);
+      startZxingLoop(video);
 
-      const tick = async () => {
-        if (!scannerActive) return;
-
-        if (!processingScan) {
-          try {
-            const codes = await detector.detect(video);
-            for (const code of codes) {
-              if (code.rawValue) {
-                handleIsbn(code.rawValue);
-                break;
-              }
-            }
-          } catch {
-            // Ignore transient detection errors.
-          }
-        }
-
-        nativeDetectLoop = requestAnimationFrame(tick);
-      };
-
-      nativeDetectLoop = requestAnimationFrame(tick);
       scannerStarting = false;
-      setScannerStatus("Aim at the ISBN barcode on the back cover");
+      setScannerStatus("Align the ISBN barcode inside the yellow guide");
       hideEnableCameraButton();
     })
     .catch((error) => {
+      if (typeof Html5Qrcode !== "undefined") {
+        startHtml5ScannerNow()
+          .then(() => {
+            scannerStarting = false;
+            setScannerStatus("Align the ISBN barcode inside the yellow guide");
+            hideEnableCameraButton();
+          })
+          .catch((fallbackError) => {
+            scannerStarting = false;
+            scannerActive = false;
+            console.error(fallbackError);
+            showEnableCameraButton(cameraErrorMessage(error));
+            window.CollectionTracker?.showToast("Could not start camera");
+          });
+        return;
+      }
+
       scannerStarting = false;
       scannerActive = false;
       console.error(error);
@@ -438,20 +466,32 @@ function startNativeScannerNow() {
 }
 
 function startScannerNow() {
-  if (typeof Html5Qrcode !== "undefined") {
-    startHtml5ScannerNow();
-  } else {
-    startNativeScannerNow();
-  }
+  startUnifiedScannerNow();
 }
 
 async function stopScanner() {
   scannerActive = false;
   scannerStarting = false;
 
+  if (barcodeDetectInterval) {
+    clearInterval(barcodeDetectInterval);
+    barcodeDetectInterval = null;
+  }
+
+  barcodeDetector = null;
+
   if (nativeDetectLoop) {
     cancelAnimationFrame(nativeDetectLoop);
     nativeDetectLoop = null;
+  }
+
+  if (zxingReader) {
+    try {
+      zxingReader.reset();
+    } catch {
+      // Already stopped.
+    }
+    zxingReader = null;
   }
 
   if (nativeStream) {

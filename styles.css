@@ -612,14 +612,39 @@ body.scanner-open {
   overflow: hidden;
   border-radius: var(--radius);
   background: #000;
-  min-height: 220px;
+  min-height: 260px;
+}
+
+.scanner-guide {
+  position: absolute;
+  left: 5%;
+  right: 5%;
+  top: 50%;
+  height: 34%;
+  transform: translateY(-50%);
+  border: 2px solid rgba(196, 163, 90, 0.95);
+  border-radius: 8px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.scanner-guide::before {
+  content: "ISBN barcode here";
+  position: absolute;
+  top: -1.6rem;
+  left: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--wishlist);
 }
 
 .scanner-video,
 .scanner-view,
 #scanner-view {
   width: 100%;
-  min-height: 220px;
+  min-height: 260px;
 }
 
 .scanner-video {
@@ -628,6 +653,7 @@ body.scanner-open {
 }
 
 .scanner-video.hidden,
+.scanner-view.hidden,
 .scanner-modal.hidden,
 .scanner-match-picker.hidden {
   display: none !important;

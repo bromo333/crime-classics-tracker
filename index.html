@@ -118,11 +118,12 @@
         <button class="scanner-close" id="scanner-close" aria-label="Close scanner">✕</button>
       </div>
 
-      <p class="scanner-hint">Point your camera at the barcode on the back cover. The book will be marked as owned if it matches the Crime Classics list.</p>
+      <p class="scanner-hint">Hold the book 15–20 cm away. Align the barcode horizontally inside the yellow guide — not the QR code if there is one.</p>
 
       <div id="scanner-view-wrap">
-        <video id="scanner-video" class="scanner-video hidden" playsinline webkit-playsinline muted autoplay></video>
-        <div id="scanner-view" class="scanner-view"></div>
+        <video id="scanner-video" class="scanner-video" playsinline webkit-playsinline muted autoplay></video>
+        <div id="scanner-view" class="scanner-view hidden"></div>
+        <div class="scanner-guide" aria-hidden="true"></div>
       </div>
 
       <button type="button" class="btn btn-primary scanner-enable-camera hidden" id="scanner-enable-camera">
@@ -147,7 +148,8 @@
     </div>
   </div>
 
-  <script src="vendor/html5-qrcode.min.js?v=6"></script>
+  <script src="vendor/zxing-browser.min.js?v=7"></script>
+  <script src="vendor/html5-qrcode.min.js?v=7"></script>
   <script>
     window.startCrimeScanner = function (event) {
       event?.preventDefault?.();
@@ -158,8 +160,8 @@
       }
     };
   </script>
-  <script src="books-data.js?v=6"></script>
-  <script src="scan.js?v=6"></script>
-  <script src="app.js?v=6"></script>
+  <script src="books-data.js?v=7"></script>
+  <script src="scan.js?v=7"></script>
+  <script src="app.js?v=7"></script>
 </body>
 </html>
