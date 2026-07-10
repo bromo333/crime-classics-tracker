@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = "crime-classics-v9";
+﻿const CACHE_NAME = "crime-classics-v10";
 
 const APP_SHELL = [
   "./index.html",
@@ -40,6 +40,11 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
   if (isAppShellRequest(event.request)) {
     event.respondWith(
       fetch(event.request)
@@ -71,5 +76,3 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
-
-

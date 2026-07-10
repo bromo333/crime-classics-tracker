@@ -97,7 +97,7 @@ function findBookMatches(lookupTitle, lookupAuthors = []) {
 
 async function lookupIsbnOpenLibrary(isbn) {
   const dataResponse = await fetch(
-    `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`
+    `https://openlibrary.org/api/books?bibkeys=ISBN:${encodeURIComponent(isbn)}&format=json&jscmd=data`
   );
   if (dataResponse.ok) {
     const data = await dataResponse.json();
@@ -112,7 +112,7 @@ async function lookupIsbnOpenLibrary(isbn) {
     }
   }
 
-  const editionResponse = await fetch(`https://openlibrary.org/isbn/${isbn}.json`);
+  const editionResponse = await fetch(`https://openlibrary.org/isbn/${encodeURIComponent(isbn)}.json`);
   if (!editionResponse.ok) {
     throw new Error("Book not found on Open Library");
   }
@@ -130,16 +130,41 @@ async function lookupIsbnOpenLibrary(isbn) {
   };
 }
 
-async function lookupIsbnGoogle(isbn) {
-  const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
+async function lookupIsbnOpenLibrarySearch(isbn) {
+  const response = await fetch(
+    `https://openlibrary.org/search.json?q=isbn:${encodeURIComponent(isbn)}&limit=1&fields=title,author_name,isbn`
+  );
   if (!response.ok) {
-    throw new Error("Google Books lookup failed");
+    throw new Error("Open Library search unavailable");
+  }
+
+  const data = await response.json();
+  const doc = data.docs?.[0];
+  if (!doc?.title) {
+    throw new Error("Book not found on Open Library");
+  }
+
+  return {
+    isbn,
+    title: doc.title,
+    authors: doc.author_name || [],
+    publishers: [],
+  };
+}
+
+async function lookupIsbnGoogle(isbn) {
+  const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}`);
+  if (response.status === 429) {
+    throw new Error("Lookup service is busy");
+  }
+  if (!response.ok) {
+    throw new Error("Online book lookup unavailable");
   }
 
   const data = await response.json();
   const info = data.items?.[0]?.volumeInfo;
   if (!info?.title) {
-    throw new Error("Book not found on Google Books");
+    throw new Error("Book not found for this ISBN");
   }
 
   return {
@@ -156,27 +181,27 @@ async function lookupIsbn(isbn) {
     return cache[isbn];
   }
 
+  const providers = [
+    lookupIsbnOpenLibrary,
+    lookupIsbnOpenLibrarySearch,
+    lookupIsbnGoogle,
+  ];
+
   let lastError = null;
 
-  try {
-    const result = await lookupIsbnOpenLibrary(isbn);
-    cache[isbn] = result;
-    saveIsbnCache(cache);
-    return result;
-  } catch (error) {
-    lastError = error;
+  for (const provider of providers) {
+    try {
+      const result = await provider(isbn);
+      cache[isbn] = result;
+      saveIsbnCache(cache);
+      return result;
+    } catch (error) {
+      lastError = error;
+      console.warn("ISBN lookup provider failed:", error);
+    }
   }
 
-  try {
-    const result = await lookupIsbnGoogle(isbn);
-    cache[isbn] = result;
-    saveIsbnCache(cache);
-    return result;
-  } catch (error) {
-    lastError = error;
-  }
-
-  throw lastError || new Error("Could not look up this ISBN");
+  throw lastError || new Error("Could not look up this ISBN online");
 }
 
 function setScannerStatus(message, type = "") {
@@ -683,3 +708,5 @@ window.closeScanner = closeScanner;
 window.setupScanner = setupScanner;
 
 setupScanner();
+
+
