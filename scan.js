@@ -1,9 +1,11 @@
 ﻿const ISBN_CACHE_KEY = "crime-classics-isbn-cache";
+const SCAN_COOLDOWN_MS = 8000;
 
 let scannerActive = false;
 let html5Scanner = null;
 let zxingReader = null;
 let processingScan = false;
+let awaitingMatch = false;
 let lastScannedIsbn = "";
 let lastScanTime = 0;
 let scannerStarting = false;
@@ -71,6 +73,10 @@ function titleMatchScore(catalogueTitle, lookupTitle) {
 
 function findBookMatches(lookupTitle, lookupAuthors = []) {
   const ct = window.CollectionTracker;
+  if (!ct?.books?.length) {
+    throw new Error("Book catalogue not loaded yet. Close and reopen the scanner.");
+  }
+
   const scored = ct.books
     .map((book) => {
       let score = titleMatchScore(book.title, lookupTitle);
@@ -89,32 +95,88 @@ function findBookMatches(lookupTitle, lookupAuthors = []) {
   return scored;
 }
 
-async function lookupIsbn(isbn) {
-  const cache = loadIsbnCache();
-  if (cache[isbn]) {
-    return cache[isbn];
+async function lookupIsbnOpenLibrary(isbn) {
+  const dataResponse = await fetch(
+    `https://openlibrary.org/api/books?bibkeys=ISBN:${isbn}&format=json&jscmd=data`
+  );
+  if (dataResponse.ok) {
+    const data = await dataResponse.json();
+    const book = data[`ISBN:${isbn}`];
+    if (book?.title) {
+      return {
+        isbn,
+        title: book.title,
+        authors: (book.authors || []).map((author) => author.name).filter(Boolean),
+        publishers: (book.publishers || []).map((publisher) => publisher.name || publisher).filter(Boolean),
+      };
+    }
   }
 
-  const response = await fetch(`https://openlibrary.org/isbn/${isbn}.json`);
+  const editionResponse = await fetch(`https://openlibrary.org/isbn/${isbn}.json`);
+  if (!editionResponse.ok) {
+    throw new Error("Book not found on Open Library");
+  }
+
+  const edition = await editionResponse.json();
+  if (!edition.title) {
+    throw new Error("Open Library returned no title for this ISBN");
+  }
+
+  return {
+    isbn,
+    title: edition.title,
+    authors: [],
+    publishers: (edition.publishers || []).map((publisher) => publisher.name || publisher).filter(Boolean),
+  };
+}
+
+async function lookupIsbnGoogle(isbn) {
+  const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`);
   if (!response.ok) {
-    throw new Error("Book not found for this ISBN");
+    throw new Error("Google Books lookup failed");
   }
 
   const data = await response.json();
-  const authors = (data.authors || [])
-    .map((author) => author.name || author.key || "")
-    .filter(Boolean);
+  const info = data.items?.[0]?.volumeInfo;
+  if (!info?.title) {
+    throw new Error("Book not found on Google Books");
+  }
 
-  const result = {
+  return {
     isbn,
-    title: data.title || "",
-    authors,
-    publishers: (data.publishers || []).map((p) => p.name || p).filter(Boolean),
+    title: info.title,
+    authors: info.authors || [],
+    publishers: info.publisher ? [info.publisher] : [],
   };
+}
 
-  cache[isbn] = result;
-  saveIsbnCache(cache);
-  return result;
+async function lookupIsbn(isbn) {
+  const cache = loadIsbnCache();
+  if (cache[isbn]?.title) {
+    return cache[isbn];
+  }
+
+  let lastError = null;
+
+  try {
+    const result = await lookupIsbnOpenLibrary(isbn);
+    cache[isbn] = result;
+    saveIsbnCache(cache);
+    return result;
+  } catch (error) {
+    lastError = error;
+  }
+
+  try {
+    const result = await lookupIsbnGoogle(isbn);
+    cache[isbn] = result;
+    saveIsbnCache(cache);
+    return result;
+  } catch (error) {
+    lastError = error;
+  }
+
+  throw lastError || new Error("Could not look up this ISBN");
 }
 
 function setScannerStatus(message, type = "") {
@@ -122,6 +184,26 @@ function setScannerStatus(message, type = "") {
   if (!status) return;
   status.textContent = message;
   status.className = "scanner-status" + (type ? ` scanner-status-${type}` : "");
+}
+
+function showScanPrompt() {
+  processingScan = false;
+  awaitingMatch = false;
+  if (scannerActive) {
+    setScannerStatus("Align the ISBN barcode inside the yellow guide, or tap Snap barcode");
+  }
+}
+
+function showScanResult(message, type = "success") {
+  processingScan = false;
+  awaitingMatch = false;
+  setScannerStatus(message, type);
+}
+
+function showScanFailure(message) {
+  processingScan = false;
+  awaitingMatch = false;
+  setScannerStatus(`${message} Tap Snap to try again, or enter the ISBN manually.`, "error");
 }
 
 function showEnableCameraButton(message) {
@@ -160,6 +242,9 @@ function showMatchPicker(matches, lookup) {
   const list = document.getElementById("scanner-match-list");
   if (!picker || !list) return;
 
+  awaitingMatch = true;
+  processingScan = true;
+
   list.innerHTML = matches
     .slice(0, 5)
     .map(
@@ -191,6 +276,7 @@ function hideMatchPicker() {
   document.getElementById("scanner-match-picker")?.classList.add("hidden");
   document.getElementById("scanner-view-wrap")?.classList.remove("hidden");
   document.getElementById("scanner-match-list")?.replaceChildren();
+  awaitingMatch = false;
   if (scannerActive) {
     document.getElementById("scanner-capture-btn")?.classList.remove("hidden");
   }
@@ -207,21 +293,26 @@ function confirmBookMatch(bookId, lookup) {
 
   ct.markOwned(bookId);
   hideMatchPicker();
-  setScannerStatus(`Added #${book.id}: ${book.title}`, "success");
+  lastScannedIsbn = "";
+  showScanResult(`Added #${book.id}: ${book.title}. Scan another book or close when done.`, "success");
   ct.showToast(`Added: ${book.title}`);
-  resumeScanning();
 }
 
-async function handleIsbn(rawIsbn) {
+async function handleIsbn(rawIsbn, options = {}) {
   const isbn = normalizeIsbn(rawIsbn);
   if (!isbn || isbn.length < 10) return;
 
   const now = Date.now();
-  if (processingScan || (isbn === lastScannedIsbn && now - lastScanTime < 3000)) {
+  const manualRetry = options.manual === true;
+  if (
+    !manualRetry &&
+    (processingScan || awaitingMatch || (isbn === lastScannedIsbn && now - lastScanTime < SCAN_COOLDOWN_MS))
+  ) {
     return;
   }
 
   processingScan = true;
+  awaitingMatch = false;
   lastScannedIsbn = isbn;
   lastScanTime = now;
   setScannerStatus(`Looking up ISBN ${isbn}...`);
@@ -234,9 +325,9 @@ async function handleIsbn(rawIsbn) {
       const book = window.CollectionTracker.books.find((b) => b.id === lookup.bookId);
       if (book) {
         window.CollectionTracker.markOwned(book.id);
-        setScannerStatus(`Added #${book.id}: ${book.title}`, "success");
+        lastScannedIsbn = "";
+        showScanResult(`Added #${book.id}: ${book.title}. Scan another book or close when done.`, "success");
         window.CollectionTracker.showToast(`Added: ${book.title}`);
-        resumeScanning();
         return;
       }
     }
@@ -245,7 +336,11 @@ async function handleIsbn(rawIsbn) {
       lookup = await lookupIsbn(isbn);
     }
 
-    const matches = findBookMatches(lookup.title, lookup.authors);
+    if (!lookup?.title) {
+      throw new Error("No title returned for this ISBN");
+    }
+
+    const matches = findBookMatches(lookup.title, lookup.authors || []);
 
     if (matches.length === 1 && matches[0].score >= 70) {
       confirmBookMatch(matches[0].book.id, lookup);
@@ -258,25 +353,12 @@ async function handleIsbn(rawIsbn) {
       return;
     }
 
-    setScannerStatus(
-      `"${lookup.title}" isn't in the Crime Classics list. Try manual entry or another copy.`,
-      "error"
-    );
+    showScanFailure(`"${lookup.title}" is not in the Crime Classics list.`);
     window.CollectionTracker.showToast("No matching Crime Classic found");
-    resumeScanning();
   } catch (error) {
-    setScannerStatus(error.message || "Lookup failed", "error");
+    console.warn("ISBN lookup failed:", error);
+    showScanFailure(error.message || "Lookup failed");
     window.CollectionTracker.showToast("Could not look up ISBN");
-    resumeScanning();
-  } finally {
-    processingScan = false;
-  }
-}
-
-function resumeScanning() {
-  processingScan = false;
-  if (scannerActive) {
-    setScannerStatus("Align the ISBN barcode inside the yellow guide, or tap Snap barcode");
   }
 }
 
@@ -289,7 +371,7 @@ function isLikelyIsbn(raw) {
 }
 
 function onBarcodeDetected(raw) {
-  if (!raw || processingScan) return;
+  if (!raw || processingScan || awaitingMatch) return;
   if (!isLikelyIsbn(raw)) return;
   handleIsbn(raw);
 }
@@ -392,7 +474,7 @@ function startZxingScannerNow() {
 }
 
 function snapBarcodeNow() {
-  if (processingScan) return;
+  if (processingScan && !awaitingMatch) return;
 
   const video = document.getElementById("scanner-video");
   if (!video || !video.videoWidth) {
@@ -424,15 +506,15 @@ function snapBarcodeNow() {
   try {
     const result = zxingReader.decodeFromCanvas(canvas);
     if (result?.getText()) {
-      onBarcodeDetected(result.getText());
+      handleIsbn(result.getText(), { manual: true });
       return;
     }
-    setScannerStatus("No barcode found - move closer, hold steady, tap Snap again", "error");
+    showScanFailure("No barcode found in that photo.");
   } catch (error) {
     if (isZxingNotFound(error)) {
-      setScannerStatus("No barcode found - move closer, hold steady, tap Snap again", "error");
+      showScanFailure("No barcode found in that photo.");
     } else {
-      setScannerStatus("Could not read barcode - try brighter light or manual entry", "error");
+      showScanFailure("Could not read barcode - try brighter light or manual entry.");
       console.warn("Snap decode error:", error);
     }
   }
@@ -459,6 +541,8 @@ function startScannerNow() {
   setScannerStatus("Requesting camera access...");
   scannerActive = true;
   processingScan = false;
+  awaitingMatch = false;
+  lastScannedIsbn = "";
 
   const startPromise =
     typeof ZXingBrowser !== "undefined" ? startZxingScannerNow() : startHtml5ScannerNow();
@@ -466,7 +550,7 @@ function startScannerNow() {
   Promise.resolve(startPromise)
     .then(() => {
       scannerStarting = false;
-      setScannerStatus("Align the ISBN barcode inside the yellow guide, or tap Snap barcode");
+      showScanPrompt();
       hideEnableCameraButton();
     })
     .catch((error) => {
@@ -476,7 +560,7 @@ function startScannerNow() {
         startHtml5ScannerNow()
           .then(() => {
             scannerStarting = false;
-            setScannerStatus("Align the ISBN barcode inside the yellow guide");
+            showScanPrompt();
             hideEnableCameraButton();
           })
           .catch((fallbackError) => {
@@ -500,6 +584,8 @@ function startScannerNow() {
 async function stopScanner() {
   scannerActive = false;
   scannerStarting = false;
+  processingScan = false;
+  awaitingMatch = false;
 
   if (zxingReader) {
     try {
@@ -546,7 +632,8 @@ function setupScanner() {
   document.getElementById("scanner-close")?.addEventListener("click", closeScanner);
   document.getElementById("scanner-cancel-match")?.addEventListener("click", () => {
     hideMatchPicker();
-    resumeScanning();
+    processingScan = false;
+    showScanPrompt();
   });
   document.getElementById("scanner-enable-camera")?.addEventListener("click", (event) => {
     event.preventDefault();
@@ -566,7 +653,7 @@ function setupScanner() {
     const input = document.getElementById("scanner-manual-isbn");
     const value = input?.value.trim();
     if (!value) return;
-    await handleIsbn(value);
+    await handleIsbn(value, { manual: true });
     if (input) input.value = "";
   });
 }
