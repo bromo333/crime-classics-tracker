@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -22,7 +22,7 @@
   <div class="app">
     <div class="install-banner hidden" id="install-banner" role="note">
       <p><strong>Install on iPhone:</strong> tap <strong>Share</strong> in Safari, then <strong>Add to Home Screen</strong>.</p>
-      <button class="install-dismiss" id="install-dismiss" aria-label="Dismiss">✕</button>
+      <button class="install-dismiss" id="install-dismiss" aria-label="Dismiss">âœ•</button>
     </div>
 
     <header class="header">
@@ -31,10 +31,10 @@
           <span class="brand-badge">BL</span>
           <div>
             <h1>Crime Classics Collection</h1>
-            <p class="subtitle">British Library Crime Classics — personal tracker</p>
+            <p class="subtitle">British Library Crime Classics â€” personal tracker</p>
           </div>
         </div>
-        <a class="source-link" href="https://shop.bl.uk/pages/crime-classics-list" target="_blank" rel="noopener">Official list ↗</a>
+        <a class="source-link" href="https://shop.bl.uk/pages/crime-classics-list" target="_blank" rel="noopener">Official list â†—</a>
       </div>
     </header>
 
@@ -67,7 +67,7 @@
         <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
           <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
         </svg>
-        <input type="search" id="search" placeholder="Search by title or author…" autocomplete="off">
+        <input type="search" id="search" placeholder="Search by title or authorâ€¦" autocomplete="off">
       </div>
 
       <div class="filter-group" role="group" aria-label="Filter books">
@@ -115,10 +115,10 @@
     <div class="scanner-panel">
       <div class="scanner-header">
         <h2 id="scanner-title">Scan ISBN barcode</h2>
-        <button class="scanner-close" id="scanner-close" aria-label="Close scanner">✕</button>
+        <button class="scanner-close" id="scanner-close" aria-label="Close scanner">âœ•</button>
       </div>
 
-      <p class="scanner-hint">Hold the book 15–20 cm away. Align the barcode horizontally inside the yellow guide — not the QR code if there is one.</p>
+      <p class="scanner-hint">Hold the book 15â€“20 cm away. Align the barcode horizontally inside the yellow guide â€” not the QR code if there is one.</p>
 
       <div id="scanner-view-wrap">
         <video id="scanner-video" class="scanner-video" playsinline webkit-playsinline muted autoplay></video>
@@ -128,6 +128,12 @@
 
       <button type="button" class="btn btn-primary scanner-enable-camera hidden" id="scanner-enable-camera">
         Enable camera
+      </button>
+
+      
+
+      <button type="button" class="btn btn-secondary scanner-capture-btn hidden" id="scanner-capture-btn">
+        Snap barcode
       </button>
 
       <p class="scanner-status" id="scanner-status" aria-live="polite"></p>
@@ -148,8 +154,8 @@
     </div>
   </div>
 
-  <script src="vendor/zxing-browser.min.js?v=7"></script>
-  <script src="vendor/html5-qrcode.min.js?v=7"></script>
+  <script src="vendor/zxing-browser.min.js?v=8"></script>
+  <script src="vendor/html5-qrcode.min.js?v=8"></script>
   <script>
     window.startCrimeScanner = function (event) {
       event?.preventDefault?.();
@@ -160,8 +166,9 @@
       }
     };
   </script>
-  <script src="books-data.js?v=7"></script>
-  <script src="scan.js?v=7"></script>
-  <script src="app.js?v=7"></script>
+  <script src="books-data.js?v=8"></script>
+  <script src="scan.js?v=8"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
+

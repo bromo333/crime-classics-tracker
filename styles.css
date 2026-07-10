@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg: #1a1612;
   --bg-card: #242018;
   --bg-elevated: #2e2820;
@@ -685,6 +685,17 @@ body.scanner-open {
   display: none;
 }
 
+.scanner-capture-btn {
+  width: 100%;
+  margin-top: 0.75rem;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.scanner-capture-btn.hidden {
+  display: none;
+}
+
 #scanner-view video {
   width: 100% !important;
   height: auto !important;
@@ -816,3 +827,4 @@ body.scanner-open {
     grid-column: 1 / -1;
   }
 }
+

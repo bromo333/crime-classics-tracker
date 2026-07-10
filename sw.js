@@ -1,4 +1,4 @@
-const CACHE_NAME = "crime-classics-v7";
+﻿const CACHE_NAME = "crime-classics-v8";
 
 const APP_SHELL = [
   "./index.html",
@@ -71,3 +71,4 @@ self.addEventListener("fetch", (event) => {
     })
   );
 });
+
